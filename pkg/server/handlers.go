@@ -5,6 +5,7 @@ import (
 	"math/big"
 	"net/http"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -16,12 +17,12 @@ import (
 
 func (s *Server) registerHandlers(g *gin.Engine) {
 
-	g.GET("/price/:chainName/:swapName/:tokens", s.queryPrice)
+	g.GET("/price/:chainName/:swapName/:tokens", s.queryPriceHandler)
 }
 
 const cacheExpireSeconds = 1
 
-func (s *Server) queryPrice(c *gin.Context) {
+func (s *Server) queryPriceHandler(c *gin.Context) {
 
 	chainName := c.Param("chainName")
 	swapName := c.Param("swapName")
@@ -58,7 +59,7 @@ func (s *Server) queryPrice(c *gin.Context) {
 			return
 		}
 
-		price, err := queryPrice(swapMap[token])
+		price, err := s.queryPrice(swapMap[token])
 		if err != nil {
 			c.JSON(http.StatusNotFound, gin.H{"msg": fmt.Sprintf("queryPrice fail:%v", err)})
 			return
@@ -88,53 +89,16 @@ func (s *Server) queryPrice(c *gin.Context) {
 	c.JSON(http.StatusOK, output)
 }
 
-// TODO cache client
-func queryPrice(route *tokenRoute) (price float64, err error) {
-	defer func() {
-		if err != nil {
-			fmt.Println("queryPrice error", err)
-		}
-	}()
-
-	client, err := ethclient.Dial(route.chain.Nodes[0])
-	if err != nil {
-		err = fmt.Errorf("ethclient.Dial fail:%v", err)
-		return
-	}
-	defer client.Close()
-
+func (s *Server) updateTokenConstant(route *tokenRoute, client *ethclient.Client) (constant *tokenConstant, err error) {
 	factoryAddr := common.HexToAddress(route.swap.Factory)
-
-	targetTokenAddr := common.HexToAddress(route.swap.Pairs[route.pairIndex].TargetTokenAddr)
-	priceTokenAddr := common.HexToAddress(route.swap.Pairs[route.pairIndex].PriceTokenAddr)
-
-	targetTokenContract, err := erc20.NewIERC20(targetTokenAddr, client)
-	if err != nil {
-		err = fmt.Errorf("NewIERC20 fail:%v", err)
-		return
-	}
-	targetTokenDecimals, err := targetTokenContract.Decimals(nil)
-	if err != nil {
-		err = fmt.Errorf("targetTokenContract.Decimals fail:%v", err)
-		return
-	}
-	priceTokenContract, err := erc20.NewIERC20(priceTokenAddr, client)
-	if err != nil {
-		err = fmt.Errorf("NewIERC20 fail:%v", err)
-		return
-	}
-	priceTokenDecimals, err := priceTokenContract.Decimals(nil)
-	if err != nil {
-		err = fmt.Errorf("priceTokenContract.Decimals fail:%v", err)
-		return
-	}
-
 	factoryCaller, err := uni.NewIUniswapV2FactoryCaller(factoryAddr, client)
 	if err != nil {
 		err = fmt.Errorf("NewIUniswapV2FactoryCaller fail:%v", err)
 		return
 	}
-
+	pair := route.swap.Pairs[route.pairIndex]
+	targetTokenAddr := common.HexToAddress(pair.TargetTokenAddr)
+	priceTokenAddr := common.HexToAddress(pair.PriceTokenAddr)
 	pairAddr, err := factoryCaller.GetPair(nil, targetTokenAddr, priceTokenAddr)
 	if err != nil {
 		err = fmt.Errorf("GetPair fail:%v", err)
@@ -144,6 +108,26 @@ func queryPrice(route *tokenRoute) (price float64, err error) {
 	pairContract, err := uni.NewIUniswapV2Pair(pairAddr, client)
 	if err != nil {
 		err = fmt.Errorf("NewIUniswapV2Pair fail:%v", err)
+		return
+	}
+	targetTokenContract, err := erc20.NewIERC20(targetTokenAddr, client)
+	if err != nil {
+		err = fmt.Errorf("targetTokenContract erc20.NewIERC20 fail:%v", err)
+		return
+	}
+	priceTokenContract, err := erc20.NewIERC20(priceTokenAddr, client)
+	if err != nil {
+		err = fmt.Errorf("priceTokenContract erc20.NewIERC20 fail:%v", err)
+		return
+	}
+	targetTokenDecimals, err := targetTokenContract.Decimals(nil)
+	if err != nil {
+		err = fmt.Errorf("targetTokenContract.Decimals fail:%v", err)
+		return
+	}
+	priceTokenDecimals, err := priceTokenContract.Decimals(nil)
+	if err != nil {
+		err = fmt.Errorf("priceTokenContract.Decimals fail:%v", err)
 		return
 	}
 
@@ -160,11 +144,76 @@ func queryPrice(route *tokenRoute) (price float64, err error) {
 	}
 
 	if !((targetTokenAddr == token0Addr && priceTokenAddr == token1Addr) || (targetTokenAddr == token1Addr && priceTokenAddr == token0Addr)) {
-		err = fmt.Errorf("invalid pair")
+		err = fmt.Errorf("invalid pair for %s", pair.TargetTokenName)
 		return
 	}
 
-	price, err = calcPrice(pairContract, targetTokenContract, priceTokenContract, targetTokenDecimals, priceTokenDecimals, targetTokenAddr == token0Addr)
+	constant = &tokenConstant{pairAddr: pairAddr, targetTokenDecimals: targetTokenDecimals, priceTokenDecimals: priceTokenDecimals, targetTokenIs0: targetTokenAddr == token0Addr}
+
+	s.constantMu.Lock()
+	if s.tokenConstants[route.chain.Name] == nil {
+		s.tokenConstants[route.chain.Name] = make(map[string]map[string]*tokenConstant)
+	}
+	if s.tokenConstants[route.chain.Name][route.swap.Name] == nil {
+		s.tokenConstants[route.chain.Name][route.swap.Name] = make(map[string]*tokenConstant)
+	}
+	s.tokenConstants[route.chain.Name][route.swap.Name][pair.TargetTokenName] = constant
+	s.constantMu.Unlock()
+	return
+}
+
+func (s *Server) queryPrice(route *tokenRoute) (price float64, err error) {
+	defer func() {
+		if err != nil {
+			fmt.Println("queryPrice error", err)
+		}
+	}()
+
+	if route.chain.Name != "eth" {
+		err = fmt.Errorf("chain %s not supported yet", route.chain.Name)
+		return
+	}
+
+	index := atomic.AddInt64(&s.ethClientIndex, 1)
+	client := s.ethClients[int(index)%len(s.ethClients)]
+	if err != nil {
+		err = fmt.Errorf("ethclient.Dial fail:%v", err)
+		return
+	}
+
+	s.constantMu.RLock()
+	constantCache := s.tokenConstants[route.chain.Name][route.swap.Name][route.swap.Pairs[route.pairIndex].TargetTokenName]
+	s.constantMu.RUnlock()
+	if constantCache == nil {
+		constantCache, err = s.updateTokenConstant(route, client)
+		if err != nil {
+			err = fmt.Errorf("updateTokenConstant fail:%v", err)
+			return
+		}
+	}
+
+	targetTokenAddr := common.HexToAddress(route.swap.Pairs[route.pairIndex].TargetTokenAddr)
+	priceTokenAddr := common.HexToAddress(route.swap.Pairs[route.pairIndex].PriceTokenAddr)
+
+	targetTokenContract, err := erc20.NewIERC20(targetTokenAddr, client)
+	if err != nil {
+		err = fmt.Errorf("NewIERC20 fail:%v", err)
+		return
+	}
+
+	priceTokenContract, err := erc20.NewIERC20(priceTokenAddr, client)
+	if err != nil {
+		err = fmt.Errorf("NewIERC20 fail:%v", err)
+		return
+	}
+
+	pairContract, err := uni.NewIUniswapV2Pair(constantCache.pairAddr, client)
+	if err != nil {
+		err = fmt.Errorf("NewIUniswapV2Pair fail:%v", err)
+		return
+	}
+
+	price, err = calcPrice(pairContract, targetTokenContract, priceTokenContract, constantCache.targetTokenDecimals, constantCache.priceTokenDecimals, constantCache.targetTokenIs0)
 	if err != nil {
 		err = fmt.Errorf("calcPrice fail:%v", err)
 		return
