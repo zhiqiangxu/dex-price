@@ -45,6 +45,8 @@ type Server struct {
 	tokenConstants map[string] /*chain*/ map[string] /*swap*/ map[string] /*token*/ *tokenConstant
 
 	ethClients []*ethclient.Client
+
+	stableCoins map[string]map[string]bool
 }
 
 func New(conf *config.Config) *Server {
@@ -53,6 +55,7 @@ func New(conf *config.Config) *Server {
 
 	var ethClients []*ethclient.Client
 	routes := make(map[string] /*chain*/ map[string] /*swap*/ map[string] /*token*/ *tokenRoute)
+	stableCoins := make(map[string]map[string]bool)
 	for _, chain := range conf.Chains {
 		chainRoute := make(map[string] /*swap*/ map[string] /*token*/ *tokenRoute)
 		for _, swap := range chain.Swaps {
@@ -63,6 +66,7 @@ func New(conf *config.Config) *Server {
 			chainRoute[swap.Name] = swapRoute
 		}
 		routes[chain.Name] = chainRoute
+		stableCoins[chain.Name] = make(map[string]bool)
 
 		if chain.Name == "eth" {
 			for _, node := range chain.Nodes {
@@ -75,6 +79,10 @@ func New(conf *config.Config) *Server {
 		} else {
 			log.Fatal(fmt.Sprintf("chain %s not supported yet", chain.Name))
 		}
+
+		for _, stableCoin := range chain.StableCoins {
+			stableCoins[chain.Name][stableCoin] = true
+		}
 	}
 
 	s := &Server{
@@ -83,7 +91,8 @@ func New(conf *config.Config) *Server {
 		routes:         routes,
 		priceCaches:    make(map[string]map[string]map[string]*priceCache),
 		tokenConstants: make(map[string]map[string]map[string]*tokenConstant),
-		ethClients:     ethClients}
+		ethClients:     ethClients,
+		stableCoins:    stableCoins}
 	s.registerHandlers(g)
 
 	return s

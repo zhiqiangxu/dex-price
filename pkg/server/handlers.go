@@ -59,10 +59,24 @@ func (s *Server) queryPriceHandler(c *gin.Context) {
 			return
 		}
 
-		price, err := s.queryPrice(swapMap[token])
+		tokenRoute := swapMap[token]
+		price, err := s.queryPrice(tokenRoute)
 		if err != nil {
 			c.JSON(http.StatusNotFound, gin.H{"msg": fmt.Sprintf("queryPrice fail:%v", err)})
 			return
+		}
+		priceToken := tokenRoute.swap.Pairs[tokenRoute.pairIndex].PriceTokenName
+		if !s.stableCoins[tokenRoute.chain.Name][priceToken] {
+			priceTokenRoute := swapMap[priceToken]
+			if priceTokenRoute == nil {
+				c.JSON(http.StatusNotFound, gin.H{"msg": fmt.Sprintf("priceToken not found:%s", priceToken)})
+			}
+			priceTokenPrice, err := s.queryPrice(tokenRoute)
+			if err != nil {
+				c.JSON(http.StatusNotFound, gin.H{"msg": fmt.Sprintf("priceTokenPrice queryPrice fail:%v", err)})
+				return
+			}
+			price = price * priceTokenPrice
 		}
 		queriedPrices = append(queriedPrices, price)
 		result[token] = price

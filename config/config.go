@@ -22,9 +22,10 @@ type Swap struct {
 
 // Chain ...
 type Chain struct {
-	Name  string
-	Nodes []string
-	Swaps []*Swap
+	Name        string
+	Nodes       []string
+	Swaps       []*Swap
+	StableCoins []string
 }
 
 // Config ...
