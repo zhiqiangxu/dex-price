@@ -1,0 +1,25 @@
+{
+    "Listen": 8899,
+    "Chains": [
+        {
+            "Name": "eth",
+            "Nodes": [
+                "http://onto-eth.ont.io:10331"
+            ],
+            "Swaps": [
+                {
+                    "Name": "uni",
+                    "Factory": "0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f",
+                    "Pairs": [
+                        {
+                            "TargetTokenName": "eth",
+                            "TargetTokenAddr": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+                            "PriceTokenName": "usdt",
+                            "PriceTokenAddr": "0xdac17f958d2ee523a2206206994597c13d831ec7"
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}
