@@ -176,10 +176,6 @@ func (s *Server) queryPrice(route *tokenRoute) (price float64, err error) {
 
 	index := atomic.AddInt64(&s.ethClientIndex, 1)
 	client := s.ethClients[int(index)%len(s.ethClients)]
-	if err != nil {
-		err = fmt.Errorf("ethclient.Dial fail:%v", err)
-		return
-	}
 
 	s.constantMu.RLock()
 	constantCache := s.tokenConstants[route.chain.Name][route.swap.Name][route.swap.Pairs[route.pairIndex].TargetTokenName]
