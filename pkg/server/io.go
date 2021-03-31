@@ -11,3 +11,9 @@ type PriceResult struct {
 	BaseResp
 	Prices []float64 `json:"prices"`
 }
+
+// TokensResult ...
+type TokensResult struct {
+	BaseResp
+	Tokens []string `json:"tokens"`
+}

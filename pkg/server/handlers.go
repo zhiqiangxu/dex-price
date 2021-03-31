@@ -18,9 +18,22 @@ import (
 func (s *Server) registerHandlers(g *gin.Engine) {
 
 	g.GET("/price/:tokens", s.queryPriceHandler)
+	g.GET("/tokens", s.queryTokensHandler)
 }
 
 const cacheExpireSeconds = 1
+
+func (s *Server) queryTokensHandler(c *gin.Context) {
+	var tokens []string
+	for token := range s.routes {
+		tokens = append(tokens, token)
+	}
+
+	var output TokensResult
+	output.Tokens = tokens
+	output.Code = http.StatusOK
+	c.JSON(http.StatusOK, output)
+}
 
 func (s *Server) queryPriceHandler(c *gin.Context) {
 
