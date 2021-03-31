@@ -36,17 +36,17 @@ type Server struct {
 	conf *config.Config
 	g    *gin.Engine
 
-	routes map[string] /*chain*/ map[string] /*swap*/ map[string] /*token*/ *tokenRoute
+	routes map[string] /*token*/ *tokenRoute
 
 	mu          sync.RWMutex
-	priceCaches map[string] /*chain*/ map[string] /*swap*/ map[string] /*token*/ *priceCache
+	priceCaches map[string] /*token*/ *priceCache
 
 	constantMu     sync.RWMutex
-	tokenConstants map[string] /*chain*/ map[string] /*swap*/ map[string] /*token*/ *tokenConstant
+	tokenConstants map[string] /*token*/ *tokenConstant
 
 	ethClients []*ethclient.Client
 
-	stableCoins map[string]map[string]bool
+	stableCoins map[string]bool
 }
 
 func New(conf *config.Config) *Server {
@@ -54,19 +54,17 @@ func New(conf *config.Config) *Server {
 	g.Use(gin.Recovery())
 
 	var ethClients []*ethclient.Client
-	routes := make(map[string] /*chain*/ map[string] /*swap*/ map[string] /*token*/ *tokenRoute)
-	stableCoins := make(map[string]map[string]bool)
+	routes := make(map[string]*tokenRoute)
+	stableCoins := make(map[string]bool)
 	for _, chain := range conf.Chains {
-		chainRoute := make(map[string] /*swap*/ map[string] /*token*/ *tokenRoute)
 		for _, swap := range chain.Swaps {
-			swapRoute := make(map[string] /*token*/ *tokenRoute)
 			for i, pair := range swap.Pairs {
-				swapRoute[pair.TargetTokenName] = &tokenRoute{chain: chain, swap: swap, pairIndex: i}
+				if routes[pair.TargetTokenName] != nil {
+					log.Fatal(fmt.Sprintf("duplicate token:%s", pair.TargetTokenName))
+				}
+				routes[pair.TargetTokenName] = &tokenRoute{chain: chain, swap: swap, pairIndex: i}
 			}
-			chainRoute[swap.Name] = swapRoute
 		}
-		routes[chain.Name] = chainRoute
-		stableCoins[chain.Name] = make(map[string]bool)
 
 		if chain.Name == "eth" {
 			for _, node := range chain.Nodes {
@@ -81,7 +79,10 @@ func New(conf *config.Config) *Server {
 		}
 
 		for _, stableCoin := range chain.StableCoins {
-			stableCoins[chain.Name][stableCoin] = true
+			if stableCoins[stableCoin] {
+				log.Fatal(fmt.Sprintf("duplicate stableCoin:%s", stableCoin))
+			}
+			stableCoins[stableCoin] = true
 		}
 	}
 
@@ -89,8 +90,8 @@ func New(conf *config.Config) *Server {
 		conf:           conf,
 		g:              g,
 		routes:         routes,
-		priceCaches:    make(map[string]map[string]map[string]*priceCache),
-		tokenConstants: make(map[string]map[string]map[string]*tokenConstant),
+		priceCaches:    make(map[string]*priceCache),
+		tokenConstants: make(map[string]*tokenConstant),
 		ethClients:     ethClients,
 		stableCoins:    stableCoins}
 	s.registerHandlers(g)

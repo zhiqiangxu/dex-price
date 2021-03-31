@@ -17,21 +17,12 @@ import (
 
 func (s *Server) registerHandlers(g *gin.Engine) {
 
-	g.GET("/price/:chainName/:swapName/:tokens", s.queryPriceHandler)
+	g.GET("/price/:tokens", s.queryPriceHandler)
 }
 
 const cacheExpireSeconds = 1
 
 func (s *Server) queryPriceHandler(c *gin.Context) {
-
-	chainName := c.Param("chainName")
-	swapName := c.Param("swapName")
-
-	swapMap := s.routes[chainName][swapName]
-	if len(swapMap) == 0 {
-		c.JSON(http.StatusNotFound, gin.H{"msg": "chain->swap not found"})
-		return
-	}
 
 	result := make(map[string]float64)
 	tokens := strings.Split(c.Param("tokens"), ",")
@@ -42,7 +33,7 @@ func (s *Server) queryPriceHandler(c *gin.Context) {
 	s.mu.RLock()
 
 	for _, token := range tokens {
-		cache := s.priceCaches[chainName][swapName][token]
+		cache := s.priceCaches[token]
 		if cache != nil && cache.ts+cacheExpireSeconds >= now {
 			result[token] = cache.price
 		} else {
@@ -54,20 +45,20 @@ func (s *Server) queryPriceHandler(c *gin.Context) {
 
 	var queriedPrices []float64
 	for _, token := range tokensToQuery {
-		if swapMap[token] == nil {
+		if s.routes[token] == nil {
 			c.JSON(http.StatusNotFound, gin.H{"msg": fmt.Sprintf("token not found:%s", token)})
 			return
 		}
 
-		tokenRoute := swapMap[token]
+		tokenRoute := s.routes[token]
 		price, err := s.queryPrice(tokenRoute)
 		if err != nil {
 			c.JSON(http.StatusNotFound, gin.H{"msg": fmt.Sprintf("queryPrice fail:%v", err)})
 			return
 		}
 		priceToken := tokenRoute.swap.Pairs[tokenRoute.pairIndex].PriceTokenName
-		if !s.stableCoins[tokenRoute.chain.Name][priceToken] {
-			priceTokenRoute := swapMap[priceToken]
+		if !s.stableCoins[priceToken] {
+			priceTokenRoute := s.routes[priceToken]
 			if priceTokenRoute == nil {
 				c.JSON(http.StatusNotFound, gin.H{"msg": fmt.Sprintf("priceToken not found:%s", priceToken)})
 			}
@@ -84,14 +75,8 @@ func (s *Server) queryPriceHandler(c *gin.Context) {
 
 	now = time.Now().Unix()
 	s.mu.Lock()
-	if s.priceCaches[chainName] == nil {
-		s.priceCaches[chainName] = make(map[string]map[string]*priceCache)
-	}
-	if s.priceCaches[chainName][swapName] == nil {
-		s.priceCaches[chainName][swapName] = make(map[string]*priceCache)
-	}
 	for i, token := range tokensToQuery {
-		s.priceCaches[chainName][swapName][token] = &priceCache{price: queriedPrices[i], ts: now}
+		s.priceCaches[token] = &priceCache{price: queriedPrices[i], ts: now}
 	}
 	s.mu.Unlock()
 
@@ -165,13 +150,8 @@ func (s *Server) updateTokenConstant(route *tokenRoute, client *ethclient.Client
 	constant = &tokenConstant{pairAddr: pairAddr, targetTokenDecimals: targetTokenDecimals, priceTokenDecimals: priceTokenDecimals, targetTokenIs0: targetTokenAddr == token0Addr}
 
 	s.constantMu.Lock()
-	if s.tokenConstants[route.chain.Name] == nil {
-		s.tokenConstants[route.chain.Name] = make(map[string]map[string]*tokenConstant)
-	}
-	if s.tokenConstants[route.chain.Name][route.swap.Name] == nil {
-		s.tokenConstants[route.chain.Name][route.swap.Name] = make(map[string]*tokenConstant)
-	}
-	s.tokenConstants[route.chain.Name][route.swap.Name][pair.TargetTokenName] = constant
+
+	s.tokenConstants[pair.TargetTokenName] = constant
 	s.constantMu.Unlock()
 	return
 }
@@ -191,8 +171,9 @@ func (s *Server) queryPrice(route *tokenRoute) (price float64, err error) {
 	index := atomic.AddInt64(&s.ethClientIndex, 1)
 	client := s.ethClients[int(index)%len(s.ethClients)]
 
+	pair := route.swap.Pairs[route.pairIndex]
 	s.constantMu.RLock()
-	constantCache := s.tokenConstants[route.chain.Name][route.swap.Name][route.swap.Pairs[route.pairIndex].TargetTokenName]
+	constantCache := s.tokenConstants[pair.TargetTokenName]
 	s.constantMu.RUnlock()
 	if constantCache == nil {
 		constantCache, err = s.updateTokenConstant(route, client)
@@ -202,8 +183,8 @@ func (s *Server) queryPrice(route *tokenRoute) (price float64, err error) {
 		}
 	}
 
-	targetTokenAddr := common.HexToAddress(route.swap.Pairs[route.pairIndex].TargetTokenAddr)
-	priceTokenAddr := common.HexToAddress(route.swap.Pairs[route.pairIndex].PriceTokenAddr)
+	targetTokenAddr := common.HexToAddress(pair.TargetTokenAddr)
+	priceTokenAddr := common.HexToAddress(pair.PriceTokenAddr)
 
 	targetTokenContract, err := erc20.NewIERC20(targetTokenAddr, client)
 	if err != nil {
