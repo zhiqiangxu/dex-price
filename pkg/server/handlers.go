@@ -95,7 +95,7 @@ func (s *Server) queryPriceHandler(c *gin.Context) {
 
 	var output PriceResult
 	for _, token := range tokens {
-		output.Prices = append(output.Prices, result[token])
+		output.Prices = append(output.Prices, TokenPrice{Symbol: token, Price: result[token]})
 	}
 	output.Code = http.StatusOK
 	c.JSON(http.StatusOK, output)

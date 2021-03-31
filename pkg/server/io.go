@@ -6,10 +6,16 @@ type BaseResp struct {
 	Msg  string `json:"msg"`
 }
 
+// TokenPrice ...
+type TokenPrice struct {
+	Symbol string  `json:"symbol"`
+	Price  float64 `json:"price"`
+}
+
 // PriceResult ...
 type PriceResult struct {
 	BaseResp
-	Prices []float64 `json:"prices"`
+	Prices []TokenPrice `json:"prices"`
 }
 
 // TokensResult ...
