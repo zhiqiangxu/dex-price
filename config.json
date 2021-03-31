@@ -18,6 +18,12 @@
                             "PriceTokenAddr": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"
                         },
                         {
+                            "TargetTokenName": "cook",
+                            "TargetTokenAddr": "0xff75ced57419bcaebe5f05254983b013b0646ef5",
+                            "PriceTokenName": "eth",
+                            "PriceTokenAddr": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"
+                        },
+                        {
                             "TargetTokenName": "eth",
                             "TargetTokenAddr": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
                             "PriceTokenName": "usdt",

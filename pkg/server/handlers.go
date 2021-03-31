@@ -117,6 +117,11 @@ func (s *Server) updateTokenConstant(route *tokenRoute, client *ethclient.Client
 		return
 	}
 
+	if pairAddr == (common.Address{}) {
+		err = fmt.Errorf(fmt.Sprintf("pair(%s/%s) not exists", pair.TargetTokenName, pair.PriceTokenName))
+		return
+	}
+
 	pairContract, err := uni.NewIUniswapV2Pair(pairAddr, client)
 	if err != nil {
 		err = fmt.Errorf("NewIUniswapV2Pair fail:%v", err)
