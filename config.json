@@ -24,6 +24,12 @@
                             "PriceTokenAddr": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"
                         },
                         {
+                            "TargetTokenName": "8pay",
+                            "TargetTokenAddr": "0xFeea0bDd3D07eb6FE305938878C0caDBFa169042",
+                            "PriceTokenName": "eth",
+                            "PriceTokenAddr": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"
+                        },
+                        {
                             "TargetTokenName": "eth",
                             "TargetTokenAddr": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
                             "PriceTokenName": "usdt",
