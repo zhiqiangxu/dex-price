@@ -74,6 +74,7 @@ func (s *Server) queryPriceHandler(c *gin.Context) {
 			priceTokenRoute := s.routes[priceToken]
 			if priceTokenRoute == nil {
 				c.JSON(http.StatusNotFound, gin.H{"msg": fmt.Sprintf("priceToken not found:%s", priceToken)})
+				return
 			}
 			priceTokenPrice, err := s.queryPrice(priceTokenRoute)
 			if err != nil {
