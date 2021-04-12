@@ -18,6 +18,12 @@
                             "PriceTokenAddr": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"
                         },
                         {
+                            "TargetTokenName": "revo",
+                            "TargetTokenAddr": "0x155040625d7ae3e9cada9a73e3e44f76d3ed1409",
+                            "PriceTokenName": "eth",
+                            "PriceTokenAddr": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"
+                        },
+                        {
                             "TargetTokenName": "cook",
                             "TargetTokenAddr": "0xff75ced57419bcaebe5f05254983b013b0646ef5",
                             "PriceTokenName": "eth",
