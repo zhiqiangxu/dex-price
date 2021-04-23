@@ -18,6 +18,12 @@
                             "PriceTokenAddr": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"
                         },
                         {
+                            "TargetTokenName": "stack",
+                            "TargetTokenAddr": "0x56a86d648c435dc707c8405b78e2ae8eb4e60ba4",
+                            "PriceTokenName": "eth",
+                            "PriceTokenAddr": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"
+                        },
+                        {
                             "TargetTokenName": "kel",
                             "TargetTokenAddr": "0x4abb9cc67bd3da9eb966d1159a71a0e68bd15432",
                             "PriceTokenName": "eth",
