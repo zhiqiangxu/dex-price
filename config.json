@@ -18,6 +18,12 @@
                             "PriceTokenAddr": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"
                         },
                         {
+                            "TargetTokenName": "lev",
+                            "TargetTokenAddr": "0xbc194e6f748a222754C3E8b9946922c09E7d4e91",
+                            "PriceTokenName": "eth",
+                            "PriceTokenAddr": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"
+                        },
+                        {
                             "TargetTokenName": "tsx",
                             "TargetTokenAddr": "0x734c90044a0ba31b3f2e640c10dc5d3540499bfd",
                             "PriceTokenName": "eth",
