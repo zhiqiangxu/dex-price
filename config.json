@@ -12,6 +12,12 @@
                     "Factory": "0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f",
                     "Pairs": [
                         {
+                            "TargetTokenName": "o3",
+                            "TargetTokenAddr": "0xee9801669c6138e84bd50deb500827b776777d28",
+                            "PriceTokenName": "usdt",
+                            "PriceTokenAddr": "0xdac17f958d2ee523a2206206994597c13d831ec7"
+                        },
+                        {
                             "TargetTokenName": "uni",
                             "TargetTokenAddr": "0x1f9840a85d5af5bf1d1762f925bdaddc4201f984",
                             "PriceTokenName": "eth",
